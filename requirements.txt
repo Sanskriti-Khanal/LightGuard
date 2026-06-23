@@ -1,0 +1,41 @@
+# LightGuard pinned dependencies — Python 3.11 / 3.12
+#
+# thrember is NOT on PyPI — install from source before pip install -r:
+#   git clone https://github.com/FutureComputing4AI/EMBER2024.git
+#   pip install ./EMBER2024
+#   pip install -r requirements.txt
+#
+# thrember pulls in lightgbm, scikit-learn, pefile, matplotlib, polars, tqdm.
+# The pins below override/supplement those where we need specific versions.
+#
+# macOS ARM: LightGBM requires libomp — install once with: brew install libomp
+# signify 0.8+ moved SignedPEFile; thrember 0.1.0 requires the old location:
+signify==0.7.1
+
+# ML
+lightgbm==4.3.0
+scikit-learn==1.4.2
+shap==0.45.1
+joblib==1.4.2
+
+# Data
+pandas==2.2.2
+numpy==1.26.4
+pyarrow==16.1.0
+
+# PE parsing (real-file scan pipeline)
+pefile==2023.2.7
+
+# Visualisation
+matplotlib==3.9.0
+seaborn==0.13.2
+
+# Filesystem monitor
+watchdog==4.0.1
+
+# Local web UI
+flask==3.0.3
+pyyaml==6.0.1
+
+# Testing
+pytest==8.2.2

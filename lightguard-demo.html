@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LightGuard — product walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E7EBF4; --bg:#F5F7FC; --panel:#FFFFFF;
+    --ink:#161F33; --muted:#5E6E88; --faint:#93A0B5; --line:#E5EAF3;
+    --brand:#5246E5; --brand-2:#7C6CFF; --brand-soft:#EEEFFE;
+    --safe:#0E9C6B; --safe-soft:#E4F5EE;
+    --warn:#B96909; --warn-soft:#FAEEDB;
+    --threat:#D22F4D; --threat-soft:#FCE7EC;
+    --chrome:#111A2E; --chrome-2:#0C1322; --chrome-ink:#E9EDF7;
+    --chrome-muted:#7C89A6; --chrome-line:#202B47;
+    --shadow:0 30px 80px -30px rgba(17,26,46,.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:Inter,system-ui,sans-serif;color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #EAE7FB 0%, transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, #DDE6F7 0%, transparent 55%),
+      var(--paper);
+    min-height:100%;display:flex;flex-direction:column;align-items:center;
+    padding:28px 18px 40px;
+  }
+
+  /* ---- intro line ---- */
+  .lede{max-width:920px;width:100%;margin:0 auto 18px;padding:0 4px}
+  .lede h1{font-family:Sora;font-weight:700;font-size:19px;letter-spacing:-.01em}
+  .lede p{color:var(--muted);font-size:13.5px;margin-top:4px;max-width:660px;line-height:1.5}
+
+  /* ---- the app window ---- */
+  .win{
+    width:100%;max-width:920px;background:var(--bg);border-radius:16px;
+    overflow:hidden;box-shadow:var(--shadow);border:1px solid #fff;
+    display:grid;grid-template-columns:212px 1fr;grid-template-rows:42px 1fr;
+    grid-template-areas:"bar bar" "rail main";min-height:560px;
+  }
+
+  /* title bar */
+  .titlebar{
+    grid-area:bar;background:var(--chrome);display:flex;align-items:center;
+    padding:0 14px;gap:10px;border-bottom:1px solid var(--chrome-line);
+  }
+  .dots{display:flex;gap:7px}
+  .dots i{width:11px;height:11px;border-radius:50%;display:block}
+  .dots i:nth-child(1){background:#ED6A5E}.dots i:nth-child(2){background:#F4BF4F}.dots i:nth-child(3){background:#61C554}
+  .tb-title{color:var(--chrome-muted);font-size:12px;font-family:'IBM Plex Mono',monospace;margin-left:6px}
+  .tb-offline{margin-left:auto;display:flex;align-items:center;gap:6px;color:#9FE3C6;
+    font-size:11px;font-weight:500;background:rgba(14,156,107,.14);padding:4px 9px;border-radius:20px;border:1px solid rgba(14,156,107,.25)}
+  .tb-offline b{width:6px;height:6px;border-radius:50%;background:#34D399;box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 7px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+
+  /* sidebar */
+  .rail{grid-area:rail;background:var(--chrome-2);padding:18px 12px;display:flex;flex-direction:column;gap:3px}
+  .brand{display:flex;align-items:center;gap:10px;padding:2px 8px 18px}
+  .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,var(--brand),var(--brand-2));
+    position:relative;flex:none;box-shadow:0 6px 18px -6px var(--brand)}
+  .mark::after{content:"";position:absolute;inset:0;border-radius:9px;
+    background:radial-gradient(8px 8px at 50% 38%, rgba(255,255,255,.9), transparent 70%)}
+  .mark::before{content:"";position:absolute;left:50%;top:50%;width:11px;height:11px;transform:translate(-50%,-50%);
+    border:2px solid #fff;border-radius:0 0 11px 11px;border-top:none;opacity:.95}
+  .brand b{font-family:Sora;font-weight:700;color:#fff;font-size:15.5px;letter-spacing:-.01em}
+  .brand span{display:block;font-size:10px;color:var(--chrome-muted);font-weight:500;margin-top:1px;letter-spacing:.02em}
+  .nav{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;color:var(--chrome-muted);
+    font-size:13px;font-weight:500;cursor:default;transition:.25s}
+  .nav svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+  .nav.on{background:linear-gradient(100deg,rgba(82,70,229,.22),rgba(124,108,255,.08));color:#fff}
+  .nav.on::before{content:"";position:absolute;left:0;width:3px;height:18px;border-radius:3px;background:var(--brand-2)}
+  .nav{position:relative}
+  .rail .spacer{flex:1}
+  .rail-foot{padding:10px 11px;border-top:1px solid var(--chrome-line);margin-top:6px}
+  .rail-foot p{color:var(--chrome-muted);font-size:10.5px;line-height:1.5}
+
+  /* main */
+  .main{grid-area:main;position:relative;overflow:hidden}
+  .scene{position:absolute;inset:0;padding:22px 26px;opacity:0;transform:translateY(8px);
+    transition:opacity .5s ease, transform .5s ease;pointer-events:none;overflow:auto}
+  .scene.show{opacity:1;transform:none;pointer-events:auto}
+
+  .head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+  .head h2{font-family:Sora;font-weight:600;font-size:20px;letter-spacing:-.01em}
+  .head p{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .badge{font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;display:inline-flex;align-items:center;gap:6px}
+  .badge.ok{background:var(--safe-soft);color:var(--safe)}
+  .badge.warn{background:var(--warn-soft);color:var(--warn)}
+  .badge.bad{background:var(--threat-soft);color:var(--threat)}
+  .badge i{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  /* dashboard */
+  .hero{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;
+    display:flex;align-items:center;gap:20px;position:relative;overflow:hidden}
+  .shield{width:74px;height:74px;border-radius:18px;flex:none;display:grid;place-items:center;
+    background:var(--safe-soft);color:var(--safe)}
+  .shield svg{width:38px;height:38px;stroke:currentColor;fill:none;stroke-width:1.7}
+  .hero h3{font-family:Sora;font-weight:600;font-size:18px}
+  .hero p{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 17px}
+  .card .ct{display:flex;align-items:center;justify-content:space-between}
+  .card .ct b{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:9px}
+  .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand)}
+  .ic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8}
+  .card .cd{color:var(--muted);font-size:11.5px;margin-top:9px;line-height:1.5}
+  .stat{display:flex;gap:22px;margin-top:13px}
+  .stat div b{font-family:Sora;font-weight:700;font-size:21px;display:block}
+  .stat div span{color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+
+  /* scan card */
+  .scan{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:0;overflow:hidden;
+    transition:border-color .5s, box-shadow .5s}
+  .scan.bad{border-color:#F2C6D0;box-shadow:0 18px 40px -22px rgba(210,47,77,.5)}
+  .scan-top{padding:18px 20px;display:flex;align-items:center;gap:15px;position:relative;overflow:hidden}
+  .file{width:50px;height:50px;border-radius:12px;flex:none;display:grid;place-items:center;
+    background:#EEF1F8;color:var(--muted);position:relative}
+  .file svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.6}
+  .scan.bad .file{background:var(--threat-soft);color:var(--threat)}
+  .fname{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:14px}
+  .fmeta{color:var(--faint);font-size:11.5px;margin-top:3px}
+  .verdict{margin-left:auto;text-align:right}
+  .vlabel{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em}
+  .vscore{font-family:Sora;font-weight:700;font-size:26px;line-height:1.1;color:var(--muted);transition:color .5s}
+  .scan.bad .vscore{color:var(--threat)}
+  /* scanning beam */
+  .beam{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
+  .beam.on{opacity:1}
+  .beam::before{content:"";position:absolute;top:0;bottom:0;width:120px;
+    background:linear-gradient(90deg,transparent,rgba(82,70,229,.16),transparent);
+    animation:sweep 1.25s linear infinite}
+  @keyframes sweep{0%{left:-130px}100%{left:100%}}
+  .scanline{padding:9px 20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;
+    font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:8px;min-height:38px}
+  .scanline .tick{color:var(--brand)}
+
+  /* explanation panel — the signature */
+  .exp{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    max-height:0;opacity:0;transition:max-height .6s ease, opacity .5s ease}
+  .exp.open{max-height:520px;opacity:1}
+  .exp-h{padding:15px 20px 13px;border-bottom:1px solid var(--line)}
+  .exp-h b{font-family:Sora;font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:8px}
+  .exp-h b svg{width:16px;height:16px;stroke:var(--brand);fill:none;stroke-width:1.8}
+  .exp-h p{color:var(--faint);font-size:11.5px;margin-top:3px}
+  .rows{padding:6px 20px 14px}
+  .row{display:grid;grid-template-columns:1fr 132px 78px;align-items:center;gap:14px;
+    padding:11px 0;border-bottom:1px solid #F1F4FA}
+  .row:last-child{border-bottom:none}
+  .row .lbl{font-size:12.5px;font-weight:500;line-height:1.4}
+  .row .lbl span{display:block;color:var(--faint);font-size:11px;font-weight:400;margin-top:2px}
+  .meter{height:8px;border-radius:6px;background:#EEF1F7;overflow:hidden}
+  .meter b{display:block;height:100%;width:0;border-radius:6px;transition:width .9s cubic-bezier(.2,.7,.2,1)}
+  .exp.open .meter b{width:var(--w)}
+  .row.bad .meter b{background:linear-gradient(90deg,#E8627C,var(--threat))}
+  .row.warn .meter b{background:linear-gradient(90deg,#E0A23C,var(--warn))}
+  .val{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink);text-align:right;font-weight:500}
+  .val span{color:var(--faint)}
+
+  .actions{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--line);background:#FBFCFE}
+  .btn{font-family:Inter;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:9px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);cursor:default;transition:.25s}
+  .btn.primary{background:var(--threat);color:#fff;border-color:var(--threat)}
+  .btn.primary.warn{background:var(--warn);border-color:var(--warn)}
+  .btn.glow{box-shadow:0 0 0 4px var(--threat-soft)}
+  .btn.glow.warnglow{box-shadow:0 0 0 4px var(--warn-soft)}
+  .spacer-r{margin-left:auto}
+
+  /* network process list */
+  .proc{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .prow{display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid #F1F4FA;transition:.4s}
+  .prow:last-child{border-bottom:none}
+  .pic{width:34px;height:34px;border-radius:9px;flex:none;display:grid;place-items:center;font-family:Sora;font-weight:700;font-size:13px;color:#fff}
+  .pname{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500}
+  .pmeta{color:var(--faint);font-size:11px;margin-top:2px}
+  .spark{margin-left:auto;display:flex;align-items:flex-end;gap:3px;height:26px}
+  .spark i{width:4px;border-radius:2px;background:#CdD6E6;background:#D0D8E8;animation:bob 1.8s ease-in-out infinite}
+  .spark i{height:30%}
+  .spark i:nth-child(2){animation-delay:.2s}.spark i:nth-child(3){animation-delay:.4s}
+  .spark i:nth-child(4){animation-delay:.1s}.spark i:nth-child(5){animation-delay:.5s}
+  .spark i:nth-child(6){animation-delay:.3s}.spark i:nth-child(7){animation-delay:.15s}
+  @keyframes bob{0%,100%{height:25%}50%{height:75%}}
+  .pstate{font-size:11px;font-weight:600;padding:4px 9px;border-radius:18px;background:var(--safe-soft);color:var(--safe);white-space:nowrap}
+  .prow.alert{background:linear-gradient(90deg,var(--warn-soft),#fff 70%)}
+  .prow.alert .spark i{background:#E6B266;animation-duration:.5s}
+  .prow.alert .pstate{background:var(--warn);color:#fff}
+  .prow.alert .pic{box-shadow:0 0 0 3px var(--warn-soft)}
+
+  /* player controls */
+  .player{width:100%;max-width:920px;margin:16px auto 0;display:flex;align-items:center;gap:14px;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px 16px;box-shadow:0 14px 40px -30px rgba(17,26,46,.6)}
+  .pbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;cursor:pointer;color:var(--ink);transition:.2s;flex:none}
+  .pbtn:hover{border-color:var(--brand);color:var(--brand)}
+  .pbtn svg{width:17px;height:17px;fill:currentColor}
+  .track{flex:1}
+  .track .cap{font-size:12px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .track .cap span{color:var(--faint);font-weight:500;font-family:'IBM Plex Mono',monospace;font-size:11px}
+  .bar{height:5px;border-radius:5px;background:#EBEFF6;margin-top:8px;overflow:hidden}
+  .bar b{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand-2));border-radius:5px}
+  .dotsnav{display:flex;gap:7px}
+  .dotsnav i{width:8px;height:8px;border-radius:50%;background:#D2DAE8;cursor:pointer;transition:.2s}
+  .dotsnav i.on{background:var(--brand);width:22px;border-radius:5px}
+
+  .note{max-width:920px;width:100%;margin:14px auto 0;color:var(--muted);font-size:12px;line-height:1.6;text-align:center}
+  .note b{color:var(--ink);font-weight:600}
+
+  @media (max-width:680px){
+    .win{grid-template-columns:1fr;grid-template-areas:"bar" "main";min-height:520px}
+    .rail{display:none}
+    .grid2{grid-template-columns:1fr}
+    .row{grid-template-columns:1fr 90px 64px;gap:8px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .beam::before,.tb-offline b,.spark i{animation:none}
+    .scene{transition:opacity .2s}
+  }
+</style>
+</head>
+<body>
+
+  <div class="lede">
+    <h1>LightGuard — how the finished app works</h1>
+    <p>A walkthrough of the offline Windows app: it watches downloads and network activity, then explains every decision in plain language. Press play, or step through the three moments below.</p>
+  </div>
+
+  <div class="win" id="win">
+    <!-- title bar -->
+    <div class="titlebar">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="tb-title">LightGuard</div>
+      <div class="tb-offline"><b></b> Running offline · nothing leaves this device</div>
+    </div>
+
+    <!-- sidebar -->
+    <div class="rail">
+      <div class="brand">
+        <div class="mark"></div>
+        <div><b>LightGuard</b><span>home protection</span></div>
+      </div>
+      <div class="nav on" data-nav="idle"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Dashboard</div>
+      <div class="nav" data-nav="download"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg> Download protection</div>
+      <div class="nav" data-nav="network"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg> Network monitor</div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg> Activity</div>
+      <div class="spacer"></div>
+      <div class="rail-foot"><p>Models run on this PC. No cloud lookups, no telemetry sent.</p></div>
+    </div>
+
+    <!-- main stage -->
+    <div class="main">
+
+      <!-- SCENE: dashboard -->
+      <section class="scene show" data-scene="idle">
+        <div class="head">
+          <div><h2>You're protected</h2><p>Both monitors are active and running locally.</p></div>
+          <span class="badge ok"><i></i> All clear</span>
+        </div>
+        <div class="hero">
+          <div class="shield"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <div style="flex:1">
+            <h3>No threats found today</h3>
+            <p>Last full check 6 minutes ago. LightGuard is watching new downloads and live network connections in the background.</p>
+            <div class="stat">
+              <div><b>134</b><span>files watched</span></div>
+              <div><b>28</b><span>apps monitored</span></div>
+              <div><b>0</b><span>threats</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <div class="ct"><b><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span> Download protection</b><span class="badge ok"><i></i> Active</span></div>
+            <div class="cd">Every new program is scanned the moment it lands, before you open it.</div>
+          </div>
+          <div class="card">
+            <div class="ct"><b><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></span> Network monitor</b><span class="badge ok"><i></i> Active</span></div>
+            <div class="cd">Watches how each app talks to the internet and flags behavior that's out of character.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE: download / malware -->
+      <section class="scene" data-scene="download">
+        <div class="head">
+          <div><h2>Download protection</h2><p>A new program arrived in your Downloads folder.</p></div>
+          <span class="badge bad" id="dl-badge" style="opacity:0;transition:.4s"><i></i> Threat blocked</span>
+        </div>
+
+        <div class="scan" id="scan">
+          <div class="scan-top">
+            <div class="beam" id="beam"></div>
+            <div class="file"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div>
+            <div>
+              <div class="fname">Invoice_Mar2026.exe</div>
+              <div class="fmeta">2.4 MB · from chrome.exe · just now</div>
+            </div>
+            <div class="verdict">
+              <div class="vlabel">risk</div>
+              <div class="vscore" id="vscore">—</div>
+            </div>
+          </div>
+          <div class="scanline" id="scanline"><span class="tick">▸</span> Waiting for new files…</div>
+        </div>
+
+        <div class="exp" id="exp-dl">
+          <div class="exp-h">
+            <b><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg> Why LightGuard flagged this</b>
+            <p>The model's strongest evidence, translated into plain language. Measured values on the right.</p>
+          </div>
+          <div class="rows">
+            <div class="row bad">
+              <div class="lbl">Code looks packed or hidden<span>High randomness suggests it's encrypted to dodge scanners</span></div>
+              <div class="meter"><b style="--w:94%"></b></div>
+              <div class="val">7.91<span>/8</span></div>
+            </div>
+            <div class="row bad">
+              <div class="lbl">Wants to inject into other programs<span>Imports WriteProcessMemory · VirtualAllocEx</span></div>
+              <div class="meter"><b style="--w:88%"></b></div>
+              <div class="val">2<span> calls</span></div>
+            </div>
+            <div class="row bad">
+              <div class="lbl">Hides what it will do<span>Almost no readable system calls declared upfront</span></div>
+              <div class="meter"><b style="--w:71%"></b></div>
+              <div class="val">9<span> imports</span></div>
+            </div>
+            <div class="row bad">
+              <div class="lbl">Not signed by a known publisher<span>No valid digital signature found</span></div>
+              <div class="meter"><b style="--w:63%"></b></div>
+              <div class="val">none</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" id="dl-act">Quarantine file</button>
+            <button class="btn">Allow once</button>
+            <button class="btn spacer-r">View full report</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE: network anomaly -->
+      <section class="scene" data-scene="network">
+        <div class="head">
+          <div><h2>Network monitor</h2><p>Live look at how your apps are talking to the internet.</p></div>
+          <span class="badge warn" id="nw-badge" style="opacity:0;transition:.4s"><i></i> Unusual activity</span>
+        </div>
+
+        <div class="proc">
+          <div class="prow">
+            <div class="pic" style="background:#4285F4">C</div>
+            <div><div class="pname">chrome.exe</div><div class="pmeta">443 · 6 connections · familiar hosts</div></div>
+            <div class="spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstate">Normal</div>
+          </div>
+          <div class="prow">
+            <div class="pic" style="background:#1DB954">S</div>
+            <div><div class="pname">Spotify.exe</div><div class="pmeta">443 · 3 connections · familiar hosts</div></div>
+            <div class="spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstate">Normal</div>
+          </div>
+          <div class="prow" id="badproc">
+            <div class="pic" style="background:#7C8597">b</div>
+            <div><div class="pname">backup_svc.exe</div><div class="pmeta" id="bp-meta">4444 · 2 connections · familiar host</div></div>
+            <div class="spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstate" id="bp-state">Normal</div>
+          </div>
+        </div>
+
+        <div class="exp" id="exp-nw">
+          <div class="exp-h">
+            <b><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg> Why backup_svc.exe looks off</b>
+            <p>This app is behaving unlike its normal baseline. Here's what changed.</p>
+          </div>
+          <div class="rows">
+            <div class="row warn">
+              <div class="lbl">Reaching out far more often<span>47 connections a minute, usually about 2</span></div>
+              <div class="meter"><b style="--w:92%"></b></div>
+              <div class="val">×23</div>
+            </div>
+            <div class="row warn">
+              <div class="lbl">Using a remote-control port<span>Port 4444 is common for backdoors, not backups</span></div>
+              <div class="meter"><b style="--w:84%"></b></div>
+              <div class="val">:4444</div>
+            </div>
+            <div class="row warn">
+              <div class="lbl">Talking to a brand-new address<span>An IP this app has never contacted before</span></div>
+              <div class="meter"><b style="--w:70%"></b></div>
+              <div class="val">185.220<span>.x</span></div>
+            </div>
+            <div class="row warn">
+              <div class="lbl">Sending out more than it takes in<span>Outbound data well above its usual pattern</span></div>
+              <div class="meter"><b style="--w:58%"></b></div>
+              <div class="val">↑ 12<span>MB</span></div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn primary warn" id="nw-act">Block this app</button>
+            <button class="btn">Investigate</button>
+            <button class="btn spacer-r">It's fine, ignore</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- player -->
+  <div class="player">
+    <button class="pbtn" id="play" aria-label="Play or pause"><svg id="playicon" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+    <button class="pbtn" id="replay" aria-label="Replay"><svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.9 8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2 8 5l4 3z"/></svg></button>
+    <div class="track">
+      <div class="cap"><span id="cap-title">Dashboard — everything's quiet</span><span id="cap-step">1 / 3</span></div>
+      <div class="bar"><b id="progress"></b></div>
+    </div>
+    <div class="dotsnav">
+      <i class="on" data-jump="0"></i><i data-jump="1"></i><i data-jump="2"></i>
+    </div>
+  </div>
+
+  <p class="note">This is an interactive mockup of the planned interface. The <b>explanation panels</b> are the real product — every alert is backed by the model's own evidence, computed and shown entirely on your machine.</p>
+
+<script>
+(function(){
+  const scenes = ["idle","download","network"];
+  const titles = ["Dashboard — everything's quiet","A risky download is caught & explained","An app starts behaving strangely"];
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let i = 0, playing = true, timers = [], rafId = null, sceneStart = 0, sceneDur = 0;
+
+  const $ = s => document.querySelector(s);
+  const els = {
+    scenes: document.querySelectorAll(".scene"),
+    navs: document.querySelectorAll(".nav[data-nav]"),
+    dots: document.querySelectorAll(".dotsnav i"),
+    capT: $("#cap-title"), capS: $("#cap-step"), prog: $("#progress"),
+    playIcon: $("#playicon")
+  };
+
+  function clearTimers(){ timers.forEach(clearTimeout); timers=[]; if(rafId) cancelAnimationFrame(rafId); }
+  function later(fn,ms){ timers.push(setTimeout(fn,ms)); }
+
+  function setScene(idx){
+    i = idx;
+    els.scenes.forEach(s=>s.classList.toggle("show", s.dataset.scene===scenes[i]));
+    els.navs.forEach(n=>n.classList.toggle("on", n.dataset.nav===scenes[i]));
+    els.dots.forEach((d,k)=>d.classList.toggle("on",k===i));
+    els.capT.textContent = titles[i];
+    els.capS.textContent = (i+1)+" / 3";
+    resetScene();
+    runScene();
+  }
+
+  function resetScene(){
+    // download
+    $("#scan").classList.remove("bad");
+    $("#beam").classList.remove("on");
+    $("#vscore").textContent="—"; $("#vscore").style.color="";
+    $("#dl-badge").style.opacity=0;
+    $("#exp-dl").classList.remove("open");
+    $("#dl-act").classList.remove("glow");
+    $("#scanline").innerHTML='<span class="tick">▸</span> Waiting for new files…';
+    // network
+    $("#badproc").classList.remove("alert");
+    $("#bp-state").textContent="Normal";
+    $("#bp-meta").textContent="4444 · 2 connections · familiar host";
+    $("#nw-badge").style.opacity=0;
+    $("#exp-nw").classList.remove("open");
+    $("#nw-act").classList.remove("glow","warnglow");
+  }
+
+  function runScene(){
+    const s = scenes[i];
+    if(s==="idle"){ sceneDur = 4200; startProgress(); }
+    else if(s==="download") runDownload();
+    else if(s==="network") runNetwork();
+  }
+
+  function runDownload(){
+    sceneDur = 9500; startProgress();
+    const beam=$("#beam"), line=$("#scanline"), score=$("#vscore");
+    later(()=>{ beam.classList.add("on"); line.innerHTML='<span class="tick">▸</span> New file detected — reading structure…'; },300);
+    later(()=>{ line.innerHTML='<span class="tick">▸</span> Extracting 2,568 features from the executable…'; },1500);
+    later(()=>{ line.innerHTML='<span class="tick">▸</span> Scoring with the local malware model…'; },2700);
+    let n=0; const tick=()=>{ n+=Math.random()*22; if(n>=96){n=96;} score.textContent=Math.round(n)+"%"; if(n<96) later(tick,90); };
+    later(tick,1500);
+    later(()=>{
+      beam.classList.remove("on");
+      $("#scan").classList.add("bad");
+      score.textContent="96%";
+      line.innerHTML='<span class="tick" style="color:var(--threat)">■</span> High risk — this looks like malware. Quarantined.';
+      $("#dl-badge").style.opacity=1;
+    },3600);
+    later(()=>$("#exp-dl").classList.add("open"),4100);
+    later(()=>$("#dl-act").classList.add("glow"),7600);
+  }
+
+  function runNetwork(){
+    sceneDur = 9500; startProgress();
+    const row=$("#badproc"), st=$("#bp-state"), meta=$("#bp-meta");
+    later(()=>{ meta.textContent="4444 · connections climbing…"; },1400);
+    later(()=>{
+      row.classList.add("alert"); st.textContent="Anomalous";
+      meta.textContent="4444 · 47 connections/min · new IP 185.220.101.x";
+      $("#nw-badge").style.opacity=1;
+    },2400);
+    later(()=>$("#exp-nw").classList.add("open"),3000);
+    later(()=>$("#nw-act").classList.add("glow","warnglow"),7600);
+  }
+
+  function startProgress(){
+    if(reduce){ els.prog.style.width="100%"; scheduleNext(); return; }
+    sceneStart = performance.now();
+    const step=(now)=>{
+      const p = Math.min(1,(now-sceneStart)/sceneDur);
+      els.prog.style.width=(p*100)+"%";
+      if(p<1){ rafId=requestAnimationFrame(step); }
+      else if(playing){ next(); }
+    };
+    rafId=requestAnimationFrame(step);
+  }
+  function scheduleNext(){ if(playing) later(next, sceneDur); }
+  function next(){ clearTimers(); setScene((i+1)%scenes.length); }
+
+  function setPlaying(p){
+    playing=p;
+    els.playIcon.innerHTML = p
+      ? '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>'
+      : '<path d="M7 5l12 7-12 7z"/>';
+    if(p){ // resume current scene from start of its remaining run
+      clearTimers(); runScene();
+    } else { clearTimers(); }
+  }
+
+  // controls
+  $("#play").addEventListener("click",()=>setPlaying(!playing));
+  $("#replay").addEventListener("click",()=>{ clearTimers(); setPlaying(true); setScene(0); });
+  els.dots.forEach(d=>d.addEventListener("click",()=>{ clearTimers(); setScene(parseInt(d.dataset.jump)); }));
+  els.navs.forEach(n=>n.addEventListener("click",()=>{ const idx=scenes.indexOf(n.dataset.nav); if(idx>=0){clearTimers(); setScene(idx);} }));
+
+  // go
+  setScene(0);
+})();
+</script>
+</body>
+</html>

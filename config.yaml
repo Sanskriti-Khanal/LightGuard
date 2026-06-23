@@ -1,0 +1,60 @@
+# LightGuard configuration — single source of truth for all settings.
+# No hardcoded paths or magic numbers anywhere in the codebase.
+
+# ── Storage-split architecture ────────────────────────────────────────────────
+# Heavy work (download, vectorize, train, SHAP plots) runs in Google Colab.
+# Locally, only the items below are expected to exist:
+#   models/lightguard_lgbm.pkl   — exported from Colab
+#   data/sample/                 — small test fixture (committed)
+#   reports/                     — metrics + plots exported from Colab (committed)
+#   a benign .exe for smoke-testing the scan pipeline
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+paths:
+  data_raw: data/raw               # NEVER exists locally — Colab only
+  data_processed: data/processed   # NEVER exists locally — Colab only
+  data_external: data/external     # third-party reference data (not committed)
+  data_sample: data/sample         # small real-shaped test fixture (committed)
+  models: models                   # model artefacts — download from Colab output
+  reports: reports                 # metrics JSON, confusion matrices, SHAP plots
+
+# ── PE file types to use ──────────────────────────────────────────────────────
+# Dot_Net is managed code — excluded so all samples are native PE.
+pe_file_types: [Win32, Win64]
+
+# ── Reproducibility ───────────────────────────────────────────────────────────
+random_seed: 42
+
+# ── Dataset split ─────────────────────────────────────────────────────────────
+# EMBER2024 canonical split: weeks 1-52 = train, weeks 53-64 = test.
+# val_fraction carves a held-out slice from the END of the training rows only
+# (preserving temporal order — do NOT random-shuffle across the boundary).
+split:
+  val_fraction: 0.1
+
+# ── LightGBM hyperparameters ──────────────────────────────────────────────────
+lgbm:
+  boosting_type: gbdt
+  objective: binary
+  metric: auc
+  num_leaves: 1024
+  n_estimators: 1000
+  learning_rate: 0.05
+  min_child_samples: 20
+  subsample: 0.8
+  subsample_freq: 1
+  colsample_bytree: 0.8
+  reg_alpha: 0.0
+  reg_lambda: 0.0
+  n_jobs: -1
+  verbose: -1
+  early_stopping_rounds: 50
+
+# ── Scoring & alerting ────────────────────────────────────────────────────────
+scoring:
+  alert_threshold: 0.80   # risk score >= this triggers HIGH RISK verdict
+
+# ── Filesystem monitor ────────────────────────────────────────────────────────
+monitor:
+  watched_folder: ~/Downloads
+  extensions: [".exe", ".dll", ".sys", ".scr", ".com"]

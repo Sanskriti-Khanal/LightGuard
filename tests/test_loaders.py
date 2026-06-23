@@ -27,7 +27,7 @@ class TestLoadConfig:
             assert key in config, f"Missing top-level key: {key}"
 
     def test_pe_file_types_default(self, config: dict) -> None:
-        assert config["pe_file_types"] == ["Win32", "Win64"]
+        assert config["pe_file_types"] == ["Win32"]
 
     def test_val_fraction_in_range(self, config: dict) -> None:
         vf = config["split"]["val_fraction"]

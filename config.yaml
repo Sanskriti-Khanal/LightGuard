@@ -20,7 +20,7 @@ paths:
 
 # ── PE file types to use ──────────────────────────────────────────────────────
 # Dot_Net is managed code — excluded so all samples are native PE.
-pe_file_types: [Win32, Win64]
+pe_file_types: [Win32]          # Win64 deferred to v2; Win32 alone is 1.56M files
 
 # ── Reproducibility ───────────────────────────────────────────────────────────
 random_seed: 42

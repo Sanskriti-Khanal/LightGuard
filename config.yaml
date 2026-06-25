@@ -25,6 +25,16 @@ pe_file_types: [Win32]          # Win64 deferred to v2; Win32 alone is 1.56M fil
 # ── Reproducibility ───────────────────────────────────────────────────────────
 random_seed: 42
 
+# ── Dataset scope ─────────────────────────────────────────────────────────────
+# v1 trains on a subset of weeks to keep Colab disk usage manageable.
+# EMBER2024 has 52 train weeks and 12 test weeks.
+# Increasing these toward null (all weeks) improves recall but requires more disk.
+# Temporal order is preserved — we always take the FIRST N weeks chronologically.
+dataset:
+  max_train_weeks: 12   # of 52; ~28% of data; set to null to use all weeks
+  max_test_weeks: 4     # of 12; set to null to use all weeks
+  # challenge: always uses all weeks (small — ~100 MB total uncompressed)
+
 # ── Dataset split ─────────────────────────────────────────────────────────────
 # EMBER2024 canonical split: weeks 1-52 = train, weeks 53-64 = test.
 # val_fraction carves a held-out slice from the END of the training rows only

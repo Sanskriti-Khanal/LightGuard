@@ -21,6 +21,9 @@ import thrember  # noqa: E402  (after stdlib/third-party block)
 
 Split = Literal["train", "test", "challenge"]
 
+# EMBER2024 PE feature vector dimensionality (verified against PEFeatureExtractor.dim)
+N_FEATURES: int = 2568
+
 
 def load_config(config_path: str | Path = "config.yaml") -> dict:
     """Read and return the project config dict from *config_path*."""
@@ -47,6 +50,40 @@ def load_split(
         y: int32 label array of shape (n_samples,).
     """
     X, y = thrember.read_vectorized_features(str(data_dir), split)
+    return X, y
+
+
+def load_split_memmap(
+    data_dir: str | Path,
+    split: Split,
+    n_features: int = N_FEATURES,
+) -> tuple[np.memmap, np.memmap]:
+    """Open (X, y) for *split* as read-only memmaps — no data copied to RAM.
+
+    Used in Colab so that only the pages LightGBM/sklearn actually touch are
+    loaded by the OS, keeping peak RAM flat even for 700K-row splits.
+
+    Args:
+        data_dir:   directory containing X_{split}.dat and y_{split}.dat.
+        split:      one of "train", "test", "challenge".
+        n_features: feature vector width (default: 2568 for EMBER2024).
+
+    Returns:
+        X: float32 memmap of shape (n_rows, n_features).
+        y: float32 memmap of shape (n_rows,).
+    """
+    data_dir = Path(data_dir)
+    X_path = data_dir / f"X_{split}.dat"
+    y_path = data_dir / f"y_{split}.dat"
+
+    if not X_path.exists():
+        raise FileNotFoundError(f"Feature array not found: {X_path}")
+    if not y_path.exists():
+        raise FileNotFoundError(f"Label array not found: {y_path}")
+
+    n_rows = y_path.stat().st_size // 4  # float32 = 4 bytes
+    X = np.memmap(X_path, dtype=np.float32, mode="r", shape=(n_rows, n_features))
+    y = np.memmap(y_path, dtype=np.float32, mode="r", shape=(n_rows,))
     return X, y
 
 

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — LightGuard{% endblock %}
+
+{% block content %}
+<div class="head">
+  <div>
+    <h2>{% if counts.threats > 0 %}{{ counts.threats }} threat{{ 's' if counts.threats != 1 }} detected{% else %}You're protected{% endif %}</h2>
+    <p>{% if counts.total == 0 %}No files scanned yet.{% else %}{{ counts.total }} file{{ 's' if counts.total != 1 }} scanned — {{ counts.clean }} clean, {{ counts.threats }} flagged.{% endif %}</p>
+  </div>
+  {% if counts.threats > 0 %}
+    <span class="badge bad"><i></i> {{ counts.threats }} threat{{ 's' if counts.threats != 1 }}</span>
+  {% else %}
+    <span class="badge ok"><i></i> All clear</span>
+  {% endif %}
+</div>
+
+<!-- hero -->
+<div class="hero">
+  <div class="shield{% if counts.threats > 0 %} threat{% endif %}">
+    {% if counts.threats > 0 %}
+      <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M12 9v4M12 16h.01"/></svg>
+    {% else %}
+      <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+    {% endif %}
+  </div>
+  <div style="flex:1">
+    {% if counts.total == 0 %}
+      <h3>Waiting for first scan</h3>
+      <p>Use <a href="{{ url_for('scan_file') }}" style="color:var(--brand)">Scan a file</a> to check an executable,
+        or start the app with a watch folder to monitor downloads automatically.</p>
+    {% elif counts.threats > 0 %}
+      <h3>{{ counts.threats }} suspicious file{{ 's' if counts.threats != 1 }} found</h3>
+      <p>Review the flagged entries below. LightGuard is still watching for new files.</p>
+    {% else %}
+      <h3>No threats found</h3>
+      <p>LightGuard has scanned {{ counts.total }} file{{ 's' if counts.total != 1 }} — all clean.</p>
+    {% endif %}
+    <div class="stat">
+      <div><b>{{ counts.total }}</b><span>files scanned</span></div>
+      <div><b>{{ counts.clean }}</b><span>clean</span></div>
+      <div><b>{{ counts.threats }}</b><span>threats</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- module status cards -->
+<div class="grid2">
+  <div class="card">
+    <div class="ct">
+      <b>
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
+        Download protection
+      </b>
+      {% if model_loaded and watch_folder %}
+        <span class="badge ok"><i></i> Active</span>
+      {% elif model_loaded %}
+        <span class="badge warn"><i></i> No folder</span>
+      {% else %}
+        <span class="badge warn"><i></i> No model</span>
+      {% endif %}
+    </div>
+    <div class="cd">
+      {% if model_loaded and watch_folder %}
+        Watching <code style="font-family:var(--font-mono);font-size:11px;background:var(--line);padding:1px 5px;border-radius:4px">{{ watch_folder }}</code> — new executables are scanned the moment they arrive.
+      {% elif model_loaded %}
+        Model loaded but no watch folder configured. Start with <code style="font-family:var(--font-mono);font-size:11px;background:var(--line);padding:1px 5px;border-radius:4px">--watch ~/Downloads</code> to enable.
+      {% else %}
+        No model loaded. Start with <code style="font-family:var(--font-mono);font-size:11px;background:var(--line);padding:1px 5px;border-radius:4px">--model models/lightguard_lgbm.txt</code>.
+      {% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">
+      <b>
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></span>
+        Network monitor
+      </b>
+      <span class="badge warn"><i></i> v2</span>
+    </div>
+    <div class="cd">Planned for v2. Will watch how each app talks to the internet and flag out-of-character behaviour.</div>
+  </div>
+</div>
+
+<!-- recent scans -->
+{% if recent %}
+<div style="margin-top:22px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Recent scans</span>
+    <a href="{{ url_for('feed') }}" style="font-size:12px;color:var(--brand);text-decoration:none;font-weight:500">View live feed →</a>
+  </div>
+  <table class="scan-table" style="background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Label</th>
+        <th>Risk</th>
+        <th>Confidence</th>
+        <th>Source</th>
+        <th>When</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in recent %}
+      <tr>
+        <td class="mono">
+          <a href="{{ url_for('result', scan_id=e.id) }}">{{ e.verdict.filename }}</a>
+        </td>
+        <td>
+          <span class="badge {% if e.verdict.label == 'MALICIOUS' %}bad{% else %}ok{% endif %}" style="font-size:10px;padding:3px 8px">
+            <i></i>{{ e.verdict.label }}
+          </span>
+        </td>
+        <td style="font-family:var(--font-mono);font-size:12px;font-weight:600;
+          color:{% if e.verdict.risk_score >= 80 %}var(--threat){% elif e.verdict.risk_score >= 50 %}var(--warn){% else %}var(--safe){% endif %}">
+          {{ e.verdict.risk_score }}/100
+        </td>
+        <td><span style="font-size:11.5px;color:var(--muted)">{{ e.verdict.confidence }}</span></td>
+        <td><span style="font-size:11px;color:var(--faint)">{{ e.source }}</span></td>
+        <td style="font-size:11px;color:var(--faint);white-space:nowrap">{{ e.scanned_at.strftime('%H:%M:%S') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

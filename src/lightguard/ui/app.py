@@ -156,6 +156,105 @@ def create_app(
 
     # ── JSON / SSE API ────────────────────────────────────────────────────────
 
+    # ── DEMO-ONLY ─────────────────────────────────────────────────────────────
+    # POST /api/scan-vector
+    # Scores a pre-extracted feature vector from data/sample/X_test.npy by row
+    # index and injects the verdict into the live feed exactly as a real scan
+    # would.  This lets the presenter show MALICIOUS / MID-risk verdicts in the
+    # UI without any real malware.
+    #
+    # NOT safe to expose on a public network — accepts arbitrary row indices and
+    # requires the sample data to be present on disk.  Remove or gate behind
+    # authentication before any non-local deployment.
+    # ── DEMO-ONLY ─────────────────────────────────────────────────────────────
+
+    @app.route("/api/scan-vector", methods=["POST"])
+    def api_scan_vector():
+        """[DEMO ONLY] Score a row from data/sample/X_test.npy and push to feed.
+
+        JSON body::
+
+            { "row": <int>, "label": "<optional display label>" }
+
+        Returns the new ScanEntry id so the caller can link to /result/<id>.
+        """
+        if model is None:
+            return jsonify({"error": "No model loaded."}), 503
+
+        body = request.get_json(silent=True) or {}
+        row  = body.get("row")
+        if row is None:
+            return jsonify({"error": "Missing required field: row (int)."}), 400
+
+        # locate the sample vectors — prefer holdout slice if available
+        sample_dir = Path(__file__).resolve().parents[3] / "data" / "sample"
+        x_path = (sample_dir / "test_holdout_X.npy"
+                  if (sample_dir / "test_holdout_X.npy").exists()
+                  else sample_dir / "X_test.npy")
+        y_path = (sample_dir / "test_holdout_y.npy"
+                  if (sample_dir / "test_holdout_y.npy").exists()
+                  else sample_dir / "y_test.npy")
+
+        if not x_path.exists():
+            return jsonify({"error": f"Sample vectors not found: {x_path}"}), 503
+
+        import numpy as np
+        X = np.load(x_path).astype(np.float32)
+        y = np.load(y_path).astype(np.float32) if y_path.exists() else None
+
+        if not (0 <= row < len(X)):
+            return jsonify({"error": f"row {row} out of range (0–{len(X)-1})."}), 400
+
+        vec = X[row]
+        prob = float(model.predict(
+            vec.reshape(1, -1), num_iteration=model.best_iteration
+        )[0])
+
+        from lightguard.monitor.scan import Verdict, _confidence
+
+        # build a display filename: "sample_row042 [BENIGN]" etc.
+        true_label_str = ""
+        if y is not None:
+            true_label_str = " [TRUE: BENIGN]" if y[row] == 0 else " [TRUE: MALICIOUS]"
+        custom_label = body.get("label", "").strip()
+        filename = custom_label if custom_label else f"sample_row{row:03d}{true_label_str}"
+
+        reasons: tuple[str, ...] = ()
+        if explainer is not None:
+            from lightguard.explain.explainer import explain_prediction
+            from lightguard.explain.translate import translate
+            top = explain_prediction(explainer, vec, top_k=top_k)
+            reasons = tuple(translate(top))
+
+        verdict = Verdict(
+            filename=filename,
+            risk_score=round(prob * 100),
+            label="MALICIOUS" if prob >= 0.80 else "BENIGN",
+            confidence=_confidence(prob, 0.80),
+            raw_prob=prob,
+            reasons=reasons,
+        )
+
+        entry = ScanEntry(
+            id=str(uuid.uuid4()),
+            verdict=verdict,
+            scanned_at=datetime.now(),
+            source="demo-vector",
+        )
+        state.add_scan(entry)
+
+        return jsonify({
+            "id":         entry.id,
+            "row":        row,
+            "filename":   filename,
+            "label":      verdict.label,
+            "risk_score": verdict.risk_score,
+            "confidence": verdict.confidence,
+            "raw_prob":   round(prob, 4),
+            "result_url": f"/result/{entry.id}",
+            "_demo_only": True,
+        }), 201
+
     @app.route("/api/recent")
     def api_recent():
         data = [

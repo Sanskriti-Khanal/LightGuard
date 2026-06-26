@@ -190,6 +190,123 @@ class TestApiRecent:
         assert r.get_json()[0]["filename"] == "putty.exe"
 
 
+# ── /api/scan-vector (demo-only route) ────────────────────────────────────────
+
+class TestScanVectorRoute:
+    """Tests for the demo-only POST /api/scan-vector route."""
+
+    # fixture: app with a real model so the route is enabled
+    @pytest.fixture()
+    def model_app(self):
+        from unittest.mock import MagicMock
+        import numpy as np
+
+        mock_model = MagicMock()
+        mock_model.predict.return_value = np.array([0.97])
+        mock_model.best_iteration = -1
+
+        flask_app = create_app(model=mock_model)
+        flask_app.config["TESTING"] = True
+        return flask_app
+
+    @pytest.fixture()
+    def model_client(self, model_app):
+        return model_app.test_client()
+
+    def test_no_model_returns_503(self, client):
+        r = client.post("/api/scan-vector",
+                        json={"row": 0},
+                        content_type="application/json")
+        assert r.status_code == 503
+
+    def test_missing_row_returns_400(self, model_client):
+        r = model_client.post("/api/scan-vector",
+                              json={},
+                              content_type="application/json")
+        assert r.status_code == 400
+        assert "row" in r.get_json()["error"]
+
+    def test_out_of_range_row_returns_400(self, model_client):
+        r = model_client.post("/api/scan-vector",
+                              json={"row": 99999},
+                              content_type="application/json")
+        assert r.status_code == 400
+
+    def test_valid_row_returns_201(self, model_client):
+        r = model_client.post("/api/scan-vector",
+                              json={"row": 0},
+                              content_type="application/json")
+        assert r.status_code == 201
+
+    def test_response_has_required_fields(self, model_client):
+        r = model_client.post("/api/scan-vector",
+                              json={"row": 0},
+                              content_type="application/json")
+        data = r.get_json()
+        for key in ("id", "row", "filename", "label", "risk_score",
+                    "confidence", "raw_prob", "result_url", "_demo_only"):
+            assert key in data, f"Missing key: {key}"
+
+    def test_demo_only_flag_is_true(self, model_client):
+        r = model_client.post("/api/scan-vector", json={"row": 0})
+        assert r.get_json()["_demo_only"] is True
+
+    def test_row_echoed_in_response(self, model_client):
+        r = model_client.post("/api/scan-vector", json={"row": 5})
+        assert r.get_json()["row"] == 5
+
+    def test_custom_label_used_as_filename(self, model_client):
+        r = model_client.post("/api/scan-vector",
+                              json={"row": 0, "label": "demo_malware"})
+        assert r.get_json()["filename"] == "demo_malware"
+
+    def test_default_filename_contains_row(self, model_client):
+        r = model_client.post("/api/scan-vector", json={"row": 7})
+        assert "007" in r.get_json()["filename"]
+
+    def test_entry_appears_in_recent(self, model_client):
+        model_client.post("/api/scan-vector", json={"row": 0})
+        recent = model_client.get("/api/recent").get_json()
+        assert any(e["source"] == "demo-vector" for e in recent)
+
+    def test_result_url_points_to_valid_entry(self, model_client):
+        r = model_client.post("/api/scan-vector", json={"row": 0})
+        result_url = r.get_json()["result_url"]
+        r2 = model_client.get(result_url)
+        assert r2.status_code == 200
+
+    def test_entry_broadcast_to_sse(self, model_app):
+        # Subscribe to SSE queue, inject a vector, confirm broadcast fires
+        q = model_app.state.subscribe()
+        with model_app.test_client() as c:
+            c.post("/api/scan-vector", json={"row": 0})
+        received = q.get_nowait()
+        assert received.source == "demo-vector"
+        model_app.state.unsubscribe(q)
+
+    def test_negative_row_returns_400(self, model_client):
+        r = model_client.post("/api/scan-vector", json={"row": -1})
+        assert r.status_code == 400
+
+    def test_malicious_label_for_high_prob(self, model_app):
+        # mock returns 0.97 → MALICIOUS
+        with model_app.test_client() as c:
+            r = c.post("/api/scan-vector", json={"row": 0})
+        assert r.get_json()["label"] == "MALICIOUS"
+
+    def test_benign_label_for_low_prob(self):
+        from unittest.mock import MagicMock
+        import numpy as np
+        mock_model = MagicMock()
+        mock_model.predict.return_value = np.array([0.05])
+        mock_model.best_iteration = -1
+        flask_app = create_app(model=mock_model)
+        flask_app.config["TESTING"] = True
+        with flask_app.test_client() as c:
+            r = c.post("/api/scan-vector", json={"row": 0})
+        assert r.get_json()["label"] == "BENIGN"
+
+
 # ── /api/events (SSE route registration) ──────────────────────────────────────
 
 class TestApiEventsRoute:

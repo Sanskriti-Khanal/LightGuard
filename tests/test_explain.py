@@ -51,10 +51,10 @@ class TestFeatureNames:
 # ── feature_description ────────────────────────────────────────────────────────
 
 class TestFeatureDescription:
-    def test_file_size_includes_bytes(self) -> None:
+    def test_file_size_readable(self) -> None:
         desc = feature_description("general_file_size", 12345.0)
-        assert "12345" in desc
-        assert "byte" in desc.lower()
+        # 12345 bytes → shown as "12 KB" in plain-English mode
+        assert "file size" in desc.lower() or "kb" in desc.lower() or "byte" in desc.lower()
 
     def test_string_count(self) -> None:
         desc = feature_description("strings_count", 300.0)
@@ -62,11 +62,11 @@ class TestFeatureDescription:
 
     def test_histogram_fallback(self) -> None:
         desc = feature_description("histogram_byte_42", 0.01)
-        assert "histogram" in desc.lower() or "bucket" in desc.lower()
+        assert "byte" in desc.lower() or "unusual" in desc.lower()
 
     def test_imports_func_hash_fallback(self) -> None:
         desc = feature_description("imports_func_hash_7", 1.5)
-        assert "import" in desc.lower() or "hash" in desc.lower()
+        assert "import" in desc.lower() or "unusual" in desc.lower()
 
     def test_string_regex_feature(self) -> None:
         # powershell regex feature
@@ -114,11 +114,18 @@ class TestTranslate:
                 "shap_value": -0.5, "raw_value": 1000.0}]
         assert "Low-risk" in translate(top)[0]
 
-    def test_shap_value_appears_in_sentence(self) -> None:
+    def test_shap_value_appears_in_verbose_sentence(self) -> None:
         top = [{"feature_idx": 0, "feature_name": "general_file_size",
                 "shap_value": 0.123, "raw_value": 100.0}]
-        sentence = translate(top)[0]
+        sentence = translate(top, verbose=True)[0]
         assert "0.123" in sentence
+
+    def test_shap_value_absent_in_clean_sentence(self) -> None:
+        top = [{"feature_idx": 0, "feature_name": "general_file_size",
+                "shap_value": 0.123, "raw_value": 100.0}]
+        sentence = translate(top, verbose=False)[0]
+        assert "0.123" not in sentence
+        assert "SHAP" not in sentence
 
     def test_empty_input(self) -> None:
         assert translate([]) == []

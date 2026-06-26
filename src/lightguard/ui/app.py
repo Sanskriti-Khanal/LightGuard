@@ -224,7 +224,7 @@ def create_app(
             from lightguard.explain.explainer import explain_prediction
             from lightguard.explain.translate import translate
             top = explain_prediction(explainer, vec, top_k=top_k)
-            reasons = tuple(translate(top))
+            reasons = tuple(translate(top, verbose=True))
 
         verdict = Verdict(
             filename=filename,

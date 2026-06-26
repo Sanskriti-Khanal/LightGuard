@@ -92,7 +92,7 @@ def scan(
         from lightguard.explain.explainer import explain_prediction
         from lightguard.explain.translate import translate
         top_features = explain_prediction(explainer, vec, top_k=top_k)
-        reasons = tuple(translate(top_features))
+        reasons = tuple(translate(top_features, verbose=True))
 
     return Verdict(
         filename=pe_path.name,

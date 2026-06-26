@@ -23,11 +23,37 @@ Usage::
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import shap
 import lightgbm as lgb
 
 from lightguard.explain.translate import FEATURE_NAMES
+
+
+def load_background(
+    data_dir: str | Path = "data/sample",
+    n: int = 200,
+    seed: int = 42,
+) -> np.ndarray | None:
+    """Load a small background sample for the SHAP explainer from disk.
+
+    Tries (in order):
+      1. data_dir/test_holdout_X.npy  — exported by the Colab notebook
+      2. data_dir/X_test.npy          — always present after make_sample.py
+
+    Returns None if neither file exists so callers can skip explanation gracefully.
+    """
+    data_dir = Path(data_dir)
+    for candidate in ("test_holdout_X.npy", "X_test.npy"):
+        p = data_dir / candidate
+        if p.exists():
+            X = np.load(p)
+            rng = np.random.default_rng(seed)
+            idx = rng.choice(len(X), size=min(n, len(X)), replace=False)
+            return X[idx].astype(np.float32)
+    return None
 
 
 def build_explainer(

@@ -60,6 +60,9 @@ class Watcher:
         model:      loaded lgb.Booster.
         on_verdict: callable that receives one Verdict per scanned file.
         threshold:  risk probability cutoff for MALICIOUS label.
+        explainer:  optional shap.TreeExplainer — when supplied, each Verdict
+                    includes plain-English reasons from SHAP.
+        top_k:      number of SHAP reasons to include per verdict.
     """
 
     def __init__(
@@ -68,11 +71,15 @@ class Watcher:
         model,
         on_verdict: Callable[[Verdict], None],
         threshold: float = 0.80,
+        explainer=None,
+        top_k: int = 5,
     ) -> None:
         self._folder = Path(folder).expanduser()
         self._model = model
         self._on_verdict = on_verdict
         self._threshold = threshold
+        self._explainer = explainer
+        self._top_k = top_k
 
         self._q: queue.Queue[Path | None] = queue.Queue()
         self._observer = Observer()
@@ -102,7 +109,8 @@ class Watcher:
 
         Useful for one-off manual scans without starting the full observer.
         """
-        return scan(pe_path, self._model, self._threshold)
+        return scan(pe_path, self._model, self._threshold,
+                    explainer=self._explainer, top_k=self._top_k)
 
     # ── internal ──────────────────────────────────────────────────────────────
 
@@ -112,7 +120,8 @@ class Watcher:
             if path is None:
                 break
             try:
-                verdict = scan(path, self._model, self._threshold)
+                verdict = scan(path, self._model, self._threshold,
+                               explainer=self._explainer, top_k=self._top_k)
                 self._on_verdict(verdict)
             except Exception:
                 log.exception("Error scanning %s", path)

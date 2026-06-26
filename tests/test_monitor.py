@@ -1,13 +1,12 @@
-"""Tests for src/lightguard/monitor/ (M4 — single-file scanning).
+"""Tests for src/lightguard/monitor/ (M4) and explain integration (M3+M4).
 
 These tests require:
   1. A known-benign PE file at data/sample/benign.exe
   2. A trained model at models/lightguard_lgbm.txt
 
-Both are skipped with a clear message when the file is absent so the test
-suite never fails on a fresh clone.  NEVER add real malware here.
+Both are skipped with a clear message when absent.  NEVER add malware here.
 
-To add a benign test binary (run once on a Windows machine or via Wine):
+To add a benign test binary:
   cp /path/to/notepad.exe data/sample/benign.exe
   git add data/sample/benign.exe
   git commit -m "data: add benign PE fixture for scan tests"
@@ -180,3 +179,95 @@ class TestWatcher:
 
         assert verdict.filename == "benign_copy.exe"
         assert verdict.label in ("MALICIOUS", "BENIGN")
+
+
+# ── explain integration ───────────────────────────────────────────────────────
+
+@pytest.fixture(scope="module")
+def explainer_fixture():
+    """Build a real SHAP explainer from the sample data + trained model."""
+    if not MODEL_PATH.exists():
+        pytest.skip(f"Model missing: {MODEL_PATH}")
+    from lightguard.malware.train import load_model
+    from lightguard.explain.explainer import build_explainer, load_background
+    model = load_model(MODEL_PATH)
+    background = load_background(REPO_ROOT / "data" / "sample", n=50)
+    if background is None:
+        pytest.skip("No background sample found in data/sample/")
+    return build_explainer(model, background), model
+
+
+class TestExplainIntegration:
+    @_SKIP_NO_EXE
+    @_SKIP_NO_MODEL
+    def test_verdict_has_reasons_when_explainer_given(self, explainer_fixture) -> None:
+        from lightguard.monitor.scan import scan
+        explainer, model = explainer_fixture
+        v = scan(BENIGN_EXE, model, explainer=explainer, top_k=5)
+        assert isinstance(v.reasons, tuple)
+        assert len(v.reasons) == 5
+
+    @_SKIP_NO_EXE
+    @_SKIP_NO_MODEL
+    def test_reasons_are_strings(self, explainer_fixture) -> None:
+        from lightguard.monitor.scan import scan
+        explainer, model = explainer_fixture
+        v = scan(BENIGN_EXE, model, explainer=explainer, top_k=5)
+        assert all(isinstance(r, str) and len(r) > 0 for r in v.reasons)
+
+    @_SKIP_NO_EXE
+    @_SKIP_NO_MODEL
+    def test_reasons_contain_direction_label(self, explainer_fixture) -> None:
+        from lightguard.monitor.scan import scan
+        explainer, model = explainer_fixture
+        v = scan(BENIGN_EXE, model, explainer=explainer, top_k=5)
+        for reason in v.reasons:
+            assert "High-risk" in reason or "Low-risk" in reason, (
+                f"Reason missing direction label: {reason!r}"
+            )
+
+    @_SKIP_NO_EXE
+    @_SKIP_NO_MODEL
+    def test_reasons_contain_shap_value(self, explainer_fixture) -> None:
+        from lightguard.monitor.scan import scan
+        explainer, model = explainer_fixture
+        v = scan(BENIGN_EXE, model, explainer=explainer, top_k=3)
+        for reason in v.reasons:
+            assert "SHAP" in reason, f"Reason missing SHAP value: {reason!r}"
+
+    @_SKIP_NO_EXE
+    @_SKIP_NO_MODEL
+    def test_no_explainer_gives_empty_reasons(self) -> None:
+        from lightguard.malware.train import load_model
+        from lightguard.monitor.scan import scan
+        model = load_model(MODEL_PATH)
+        v = scan(BENIGN_EXE, model)
+        assert v.reasons == ()
+
+    @_SKIP_NO_EXE
+    @_SKIP_NO_MODEL
+    def test_str_includes_reasons(self, explainer_fixture) -> None:
+        from lightguard.monitor.scan import scan
+        explainer, model = explainer_fixture
+        v = scan(BENIGN_EXE, model, explainer=explainer, top_k=3)
+        s = str(v)
+        assert "•" in s
+        assert v.reasons[0][:20] in s
+
+    @_SKIP_NO_EXE
+    @_SKIP_NO_MODEL
+    def test_load_background_returns_array(self) -> None:
+        from lightguard.explain.explainer import load_background
+        bg = load_background(REPO_ROOT / "data" / "sample", n=50)
+        assert bg is not None
+        assert bg.shape == (50, 2568)
+        assert bg.dtype.kind == "f"
+
+    @_SKIP_NO_EXE
+    @_SKIP_NO_MODEL
+    def test_top_k_respected(self, explainer_fixture) -> None:
+        from lightguard.monitor.scan import scan
+        explainer, model = explainer_fixture
+        for k in (1, 3, 7):
+            v = scan(BENIGN_EXE, model, explainer=explainer, top_k=k)
+            assert len(v.reasons) == k

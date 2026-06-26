@@ -11,19 +11,24 @@ import pytest
 import yaml
 
 # ── thrember stub ─────────────────────────────────────────────────────────────
-# thrember is not installed in the local dev environment (it lives in Colab).
-# Tests that exercise thrember code paths patch it explicitly via unittest.mock.
-# This module-level stub lets `import thrember` succeed at collection time.
+# Install a minimal stub only when the real thrember is not importable (e.g. on
+# a developer machine without the EMBER2024 repo cloned).  When the real package
+# IS present (local venv with thrember installed, or Colab), we leave it alone so
+# that monitor tests using PEFeatureExtractor get the genuine implementation.
 if "thrember" not in sys.modules:
-    stub = types.ModuleType("thrember")
-    stub.__version__ = "0.0.0-stub"          # type: ignore[attr-defined]
-    stub.download_dataset = MagicMock()
-    stub.download_models = MagicMock()
-    stub.create_vectorized_features = MagicMock()
-    stub.read_vectorized_features = MagicMock()
-    stub.read_metadata = MagicMock()
-    stub.train_model = MagicMock()
-    sys.modules["thrember"] = stub
+    try:
+        import thrember as _real_thrember  # noqa: F401  — keep in sys.modules
+    except ImportError:
+        stub = types.ModuleType("thrember")
+        stub.__version__ = "0.0.0-stub"          # type: ignore[attr-defined]
+        stub.download_dataset = MagicMock()
+        stub.download_models = MagicMock()
+        stub.create_vectorized_features = MagicMock()
+        stub.read_vectorized_features = MagicMock()
+        stub.read_metadata = MagicMock()
+        stub.train_model = MagicMock()
+        stub.PEFeatureExtractor = MagicMock()
+        sys.modules["thrember"] = stub
 
 
 # ── Config & paths ────────────────────────────────────────────────────────────

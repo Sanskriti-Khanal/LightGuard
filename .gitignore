@@ -48,3 +48,6 @@ htmlcov/
 # ── Misc ──────────────────────────────────────────────────────────────────────
 *.log
 *.tmp
+
+# v2 network baselines — machine-specific, not committed
+data/network/

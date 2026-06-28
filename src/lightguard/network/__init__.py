@@ -1,7 +1,25 @@
-"""
-Reserved for v2 — per-process network anomaly detection module.
+"""LightGuard v2 — per-process network anomaly detection module.
 
-This package is intentionally empty in v1. A future release will add real-time
-per-process network traffic analysis to complement the static PE-feature
-malware classifier in lightguard.malware.
+Public API::
+
+    from lightguard.network.collector import (
+        collect_snapshot,
+        collect_baseline,
+        save_baseline,
+        load_baseline,
+    )
 """
+
+from lightguard.network.collector import (
+    collect_baseline,
+    collect_snapshot,
+    load_baseline,
+    save_baseline,
+)
+
+__all__ = [
+    "collect_baseline",
+    "collect_snapshot",
+    "load_baseline",
+    "save_baseline",
+]

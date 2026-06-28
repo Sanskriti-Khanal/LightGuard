@@ -44,7 +44,13 @@ FEATURE_COLS: list[str] = [
 _DEFAULT_DETECTOR_PATH = Path("data") / "network" / "detector.joblib"
 
 # Anomaly scores >= this threshold are labelled ANOMALOUS (out of 100).
-DEFAULT_THRESHOLD: int = 50
+# Set lower than 50 because IsolationForest alone is unreliable on small
+# baselines; the rule-based component catches clear outliers first.
+DEFAULT_THRESHOLD: int = 40
+
+# Rule-based score: max z-score across features × this factor → score 0-100.
+# z=4 → 40 (just above threshold), z=10 → 100.
+_RULE_SCALE: float = 10.0
 
 
 @dataclass
@@ -57,6 +63,10 @@ class NetworkDetector:
         feature_cols:    ordered list of feature column names.
         baseline_stats:  per-feature dict of {"mean": float, "std": float}
                          used by explain.py to describe deviations.
+        score_p95:       95th-percentile decision_function score on the baseline
+                         (the "most normal" anchor for score normalisation).
+        score_spread:    p95 minus the baseline minimum df score; sets the
+                         denominator for normalising IsolationForest outputs.
         threshold:       anomaly_score cutoff for ANOMALOUS label.
         contamination:   IsolationForest contamination parameter used at fit time.
     """
@@ -64,7 +74,9 @@ class NetworkDetector:
     scaler:         StandardScaler
     feature_cols:   list[str]
     baseline_stats: dict[str, dict[str, float]]
-    threshold:      int  = DEFAULT_THRESHOLD
+    score_p95:      float = 0.5
+    score_spread:   float = 1.0
+    threshold:      int   = DEFAULT_THRESHOLD
     contamination:  float = 0.1
 
 
@@ -109,7 +121,8 @@ def train(
     )
     model.fit(X_scaled)
 
-    # Store per-feature mean/std from the raw (unscaled) baseline for explain.py.
+    # Store per-feature mean/std from the raw (unscaled) baseline for explain.py
+    # and the rule-based scorer.
     stats: dict[str, dict[str, float]] = {}
     for i, col in enumerate(FEATURE_COLS):
         col_vals = X[:, i]
@@ -118,11 +131,21 @@ def train(
             "std":  float(np.std(col_vals)),
         }
 
+    # Calibrate the score normalisation to this baseline's decision_function
+    # distribution so scores spread across 0-100 relative to what the model
+    # considers "normal" for this machine.
+    baseline_df_scores = model.decision_function(X_scaled)
+    score_p95   = float(np.percentile(baseline_df_scores, 95))
+    score_min   = float(np.min(baseline_df_scores))
+    score_spread = max(0.05, score_p95 - score_min)
+
     return NetworkDetector(
         model=model,
         scaler=scaler,
         feature_cols=FEATURE_COLS,
         baseline_stats=stats,
+        score_p95=score_p95,
+        score_spread=score_spread,
         threshold=threshold,
         contamination=contamination,
     )
@@ -162,12 +185,33 @@ def score(
     X_raw = snapshot_df[FEATURE_COLS].fillna(0).astype(float).values
     X_scaled = detector.scaler.transform(X_raw)
 
-    # decision_function: more negative = more anomalous.
-    # Map to [0, 100] where 100 = most anomalous.
-    # Empirical range of IsolationForest decision_function is roughly [-0.5, 0.5];
-    # we clip after mapping so extreme values stay in range.
+    # ── IsolationForest score ────────────────────────────────────────────────
+    # Normalise against the baseline's own decision_function distribution so
+    # the full 0-100 range is used regardless of how tight or wide that range is.
+    # A process at the baseline p95 (most normal) → ~0; anything more anomalous
+    # than the baseline minimum → ≥100.
     raw_scores = detector.model.decision_function(X_scaled)
-    anomaly_scores = np.clip((0.5 - raw_scores) * 100, 0, 100).astype(int)
+    if_scores  = np.clip(
+        (detector.score_p95 - raw_scores) / detector.score_spread * 100,
+        0, 100,
+    )
+
+    # ── Rule-based score ────────────────────────────────────────────────────
+    # IsolationForest on small / noisy baselines may miss obvious outliers.
+    # This deterministic rule catches processes whose worst feature is many
+    # standard deviations above the baseline mean regardless of the model's
+    # opinion.  rule_score = min(100, max_z * RULE_SCALE).
+    stats = detector.baseline_stats
+    rule_scores = np.zeros(len(X_raw))
+    for i, col in enumerate(detector.feature_cols):
+        mean = stats[col]["mean"]
+        std  = stats[col]["std"]
+        z = (X_raw[:, i] - mean) / std if std > 1e-9 else np.zeros(len(X_raw))
+        rule_scores = np.maximum(rule_scores, z * _RULE_SCALE)
+    rule_scores = np.clip(rule_scores, 0, 100)
+
+    # Combined: take whichever signal is stronger.
+    anomaly_scores = np.maximum(if_scores, rule_scores).astype(int)
 
     labels = [
         "ANOMALOUS" if s >= detector.threshold else "NORMAL"

@@ -245,9 +245,9 @@ def _collect_and_train(
 
 # ── Anomaly simulator ─────────────────────────────────────────────────────────
 
-_SIM_PORT     = 31337   # obviously unusual port
-_SIM_N_CONNS  = 40      # connections to hold open
-_SIM_INTERVAL = 0.05    # seconds between connection bursts
+_SIM_PORTS    = [31337, 4444]   # obviously unusual ports
+_SIM_N_CONNS  = 120             # connections to hold open (60 per port)
+_SIM_INTERVAL = 0.02            # seconds between connection bursts
 
 
 class _AnomalySimulator:
@@ -281,50 +281,60 @@ class _AnomalySimulator:
         self._clients.clear()
 
     def _run(self) -> None:
-        # Start a local accept server so connections can complete
-        try:
-            self._server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self._server.bind(("127.0.0.1", _SIM_PORT))
-            self._server.listen(256)
-            self._server.settimeout(1.0)
-        except OSError as e:
-            print(_red(f"\n  [simulator] Cannot bind port {_SIM_PORT}: {e}"))
-            return
-
+        # Start one accept server per unusual port.
+        servers: list[socket.socket] = []
         accepted: list[socket.socket] = []
 
-        # Acceptor thread so the server-side connections don't block
-        def _acceptor():
+        for port in _SIM_PORTS:
+            try:
+                srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                srv.bind(("127.0.0.1", port))
+                srv.listen(256)
+                srv.settimeout(1.0)
+                servers.append(srv)
+                self._server = srv   # keep last for cleanup reference
+            except OSError as e:
+                print(_red(f"\n  [simulator] Cannot bind port {port}: {e}"))
+
+        if not servers:
+            return
+
+        def _acceptor(srv: socket.socket) -> None:
             while not self._stop.is_set():
                 try:
-                    conn, _ = self._server.accept()
+                    conn, _ = srv.accept()
                     accepted.append(conn)
                 except (socket.timeout, OSError):
                     pass
 
-        acc_thread = threading.Thread(target=_acceptor, daemon=True)
-        acc_thread.start()
+        for srv in servers:
+            threading.Thread(target=_acceptor, args=(srv,), daemon=True).start()
 
-        # Open _SIM_N_CONNS client sockets and keep them alive
-        for _ in range(_SIM_N_CONNS):
-            if self._stop.is_set():
-                break
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(2.0)
-                s.connect(("127.0.0.1", _SIM_PORT))
-                self._clients.append(s)
-                time.sleep(_SIM_INTERVAL)
-            except OSError:
-                pass
+        # Open _SIM_N_CONNS connections spread across all unusual ports.
+        conns_per_port = max(1, _SIM_N_CONNS // len(servers))
+        for port in _SIM_PORTS:
+            for _ in range(conns_per_port):
+                if self._stop.is_set():
+                    break
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(2.0)
+                    s.connect(("127.0.0.1", port))
+                    self._clients.append(s)
+                    time.sleep(_SIM_INTERVAL)
+                except OSError:
+                    pass
 
-        # Hold connections open until stopped
+        # Hold all connections open until stopped.
         while not self._stop.is_set():
             time.sleep(0.5)
 
         for s in accepted:
             try: s.close()
+            except Exception: pass
+        for srv in servers:
+            try: srv.close()
             except Exception: pass
 
 
@@ -406,7 +416,7 @@ def _parse_args() -> argparse.Namespace:
         "--simulate", action="store_true",
         help=(
             f"inject a synthetic anomaly: open {_SIM_N_CONNS} connections to "
-            f"localhost:{_SIM_PORT} so this process appears ANOMALOUS"
+            f"localhost on ports {_SIM_PORTS} so this process appears ANOMALOUS"
         ),
     )
     p.add_argument(

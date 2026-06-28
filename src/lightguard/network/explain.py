@@ -27,8 +27,8 @@ if TYPE_CHECKING:
 # Each entry maps a feature name to a pair of (high-deviation, borderline) messages.
 # The first string fires when z-score >= HIGH_Z; the second when >= BORDER_Z.
 
-_HIGH_Z   = 2.0   # standard deviations above baseline mean → "far more than usual"
-_BORDER_Z = 1.0   # z-score range that triggers the softer wording
+_HIGH_Z   = 1.5   # standard deviations above baseline mean → "far more than usual"
+_BORDER_Z = 0.8   # z-score range that triggers the softer wording
 
 _FEATURE_MESSAGES: dict[str, tuple[str, str]] = {
     "conn_per_min": (
@@ -138,7 +138,12 @@ def explain_snapshot(
     def _reasons(row: pd.Series) -> list[str]:
         if row.get("label") != "ANOMALOUS":
             return []
-        return explain_process(row, detector, top_k=top_k)
+        reasons = explain_process(row, detector, top_k=top_k)
+        # If no z-score reason fired but process is still ANOMALOUS (model-only
+        # flag), produce a generic fallback so the UI is never empty.
+        if not reasons:
+            reasons = ["Unusual combination of connection patterns detected"]
+        return reasons
 
     out["reasons"] = out.apply(_reasons, axis=1)
     return out

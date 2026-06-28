@@ -350,7 +350,7 @@ def _live_loop(
 
     sim: _AnomalySimulator | None = None
     if simulate:
-        print(_c(_YELLOW, f"  [simulate] Starting anomaly generator on port {_SIM_PORT}…"))
+        print(_c(_YELLOW, f"  [simulate] Starting anomaly generator on ports {_SIM_PORTS}…"))
         sim = _AnomalySimulator()
         sim.start()
         print(_c(_YELLOW, f"  [simulate] Holding {_SIM_N_CONNS} open connections. "

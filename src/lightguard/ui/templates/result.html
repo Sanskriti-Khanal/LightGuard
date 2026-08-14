@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.verdict.filename }} — LightGuard{% endblock %}
+
+{% block content %}
+{% set v = entry.verdict %}
+{% set is_bad = v.label == 'MALICIOUS' %}
+
+<div class="head">
+  <div>
+    <h2>Scan result</h2>
+    <p>Scanned {{ entry.scanned_at.strftime('%Y-%m-%d at %H:%M:%S') }} · source: {{ entry.source }}</p>
+  </div>
+  <a href="{{ url_for('dashboard') }}" class="btn" style="font-size:12px;padding:7px 13px">← Dashboard</a>
+</div>
+
+<!-- verdict card -->
+<div class="scan{% if is_bad %} bad{% endif %}">
+  <div class="scan-top">
+    <div class="file">
+      <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+    </div>
+    <div>
+      <div class="fname">{{ v.filename }}</div>
+      <div class="fmeta">raw probability {{ '%.4f'|format(v.raw_prob) }} · confidence {{ v.confidence }}</div>
+    </div>
+    <div class="verdict">
+      <div class="vlabel">risk score</div>
+      <div class="vscore">{{ v.risk_score }}/100</div>
+    </div>
+  </div>
+  <div style="padding:0 20px 14px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:12px">
+    <span class="badge {% if is_bad %}bad{% else %}ok{% endif %}">
+      <i></i>{{ v.label }}
+    </span>
+    {% if is_bad %}
+      <span style="font-size:12px;color:var(--muted)">Risk score ≥ 80 — flagged as potentially malicious.</span>
+    {% else %}
+      <span style="font-size:12px;color:var(--muted)">Risk score below threshold — no malicious indicators found.</span>
+    {% endif %}
+    <a href="{{ url_for('scan_file') }}" class="btn" style="margin-left:auto;font-size:12px;padding:7px 13px">Scan another</a>
+  </div>
+</div>
+
+<!-- explanation panel -->
+{% if reasons %}
+<div class="exp" style="margin-top:14px">
+  <div class="exp-h">
+    <b>
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+      {% if is_bad %}Why LightGuard flagged this{% else %}Why LightGuard cleared this{% endif %}
+    </b>
+    <p>The model's {{ reasons|length }} strongest evidence features, translated into plain language. SHAP value shows each feature's contribution to the risk score.</p>
+  </div>
+  <div class="rows">
+    {% for r in reasons %}
+    <div class="row {{ r.severity }}">
+      <div class="lbl">
+        {{ r.desc }}
+        <span>{{ r.direction }} indicator</span>
+      </div>
+      <div class="meter">
+        <b style="width:{{ r.width }}%"></b>
+      </div>
+      <div class="val">
+        {% if r.shap >= 0 %}+{% endif %}{{ '%.3f'|format(r.shap) }}<span> SHAP</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="exp" style="margin-top:14px">
+  <div class="exp-h">
+    <b>
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+      Explanation unavailable
+    </b>
+    <p>Start the app with a SHAP explainer to see which features drove this verdict.</p>
+  </div>
+  <div class="empty" style="padding:28px 20px">
+    <p>Run <code>python scripts/run_app.py --model models/lightguard_lgbm.txt</code> to enable explanations.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

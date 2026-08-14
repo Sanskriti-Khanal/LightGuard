@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Scan a file — LightGuard{% endblock %}
+
+{% block content %}
+<div class="head">
+  <div>
+    <h2>Scan a file</h2>
+    <p>Upload a Windows executable to check it against the local malware model.</p>
+  </div>
+</div>
+
+{% if not model_loaded %}
+<div class="notice">
+  <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;flex:none">
+    <circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>
+  </svg>
+  No model loaded — scanning is disabled. Start the app with
+  <code>--model models/lightguard_lgbm.txt</code> to enable this feature.
+</div>
+{% endif %}
+
+{% if error %}
+<div class="err-box">
+  <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;flex:none">
+    <circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>
+  </svg>
+  {{ error }}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" id="scan-form">
+  <div class="upload-area" id="drop-zone">
+    <input type="file" name="file" id="file-input" accept=".exe,.dll,.sys,.scr,.com"
+           {% if not model_loaded %}disabled{% endif %} />
+    <div class="up-icon">
+      <svg viewBox="0 0 24 24">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 3v5h5"/><path d="M12 11v6m0 0-2-2m2 2 2-2"/>
+      </svg>
+    </div>
+    <h3>{% if model_loaded %}Drop an executable here{% else %}Scanning disabled{% endif %}</h3>
+    <p>
+      {% if model_loaded %}
+        Accepts .exe, .dll, .sys, .scr, .com — up to 32 MB.<br>
+        <strong>Only scan files you own or have permission to analyse.</strong>
+      {% else %}
+        Load a model to enable file scanning.
+      {% endif %}
+    </p>
+    <div class="file-chosen" id="file-chosen"></div>
+  </div>
+
+  <div class="btn-row">
+    <button type="submit" class="btn primary" id="scan-btn" {% if not model_loaded %}disabled{% endif %}>
+      <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8">
+        <circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      Scan file
+    </button>
+    <a href="{{ url_for('dashboard') }}" class="btn">Cancel</a>
+    <span id="scanning-msg" style="font-size:12.5px;color:var(--muted);display:none;margin-left:6px">
+      Extracting features and scoring…
+    </span>
+  </div>
+</form>
+
+<div style="margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px">
+  <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">What happens when you scan</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px">① Feature extraction</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5">2,568 structural properties are read from the PE headers, sections, imports, and strings — no code is executed.</div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px">② Model scoring</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5">The LightGBM classifier assigns a risk score from 0 to 100 using a model trained on EMBER2024 PE samples.</div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px">③ Explanation</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5">SHAP values identify which features drove the verdict and translate them into plain English — no black box.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const input   = document.getElementById('file-input');
+  const chosen  = document.getElementById('file-chosen');
+  const btn     = document.getElementById('scan-btn');
+  const msg     = document.getElementById('scanning-msg');
+  const form    = document.getElementById('scan-form');
+  const zone    = document.getElementById('drop-zone');
+
+  if (!input) return;
+
+  input.addEventListener('change', () => {
+    if (input.files.length > 0) {
+      chosen.textContent = input.files[0].name;
+      chosen.style.display = 'block';
+    }
+  });
+
+  // Drag-over highlight
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', () => zone.classList.remove('drag-over'));
+
+  form.addEventListener('submit', () => {
+    if (btn) btn.disabled = true;
+    if (msg) msg.style.display = 'inline';
+  });
+})();
+</script>
+{% endblock %}
